@@ -4,6 +4,9 @@
 #include <Windows.h>
 #include <Shader.h>
 #include <stb_image.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
@@ -11,6 +14,15 @@ void processInput(GLFWwindow* window);
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+
+bool inputing = false;
+bool resetShape = false;
+glm::mat4 transByInput = glm::mat4(1.0f);
+glm::mat4 scaleByInput = glm::mat4(1.0f);
+glm::mat4 rotateByInput = glm::mat4(1.0f);
+const float translateForce = 0.005f;
+const float scaleForce = 0.005f;
+const float rotateForce = 1.0f;
 
 int main()
 {
@@ -158,6 +170,14 @@ int main()
 	glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0); // set it manually
 	ourShader.setInt("texture2", 1); // or with shader class
 
+	//// transform and translate
+	//glm::mat4 trans = glm::mat4(1.0f);
+	//trans = glm::rotate(trans, glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	//trans = glm::translate(trans, glm::vec3(0.5f, 0.0f, 0.0f));
+	//trans = glm::scale(trans, glm::vec3(0.5f, 0.5f, 0.5f));
+	//unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
+	//glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+
 	// uncomment this call to draw in wireframe polygons.
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -165,10 +185,35 @@ int main()
 	// --------------------------------------------------------- our render loop (smth like update in unity!)
 	// ---------------------------------------------------------
 
+	unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
+	glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+	glm::mat4 shapeTransform = glm::mat4(1.0f);
+	glm::mat4 shapeScale = glm::mat4(1.0f);
+	glm::mat4 shapeRotate = glm::mat4(1.0f);
 	while (!glfwWindowShouldClose(window))
 	{
 		// input handler
 		processInput(window);
+
+		if (inputing)
+		{
+			inputing = false;
+			shapeTransform = transByInput * shapeTransform;
+			shapeScale = scaleByInput * shapeScale;
+			shapeRotate = rotateByInput * shapeRotate;
+			transByInput = glm::mat4(1.0f);
+			scaleByInput = glm::mat4(1.0f);
+			rotateByInput = glm::mat4(1.0f);
+			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(shapeScale * shapeRotate * shapeTransform));
+		}
+		if (resetShape)
+		{
+			resetShape = false;
+			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+			shapeTransform = glm::mat4(1.0f);
+			shapeScale = glm::mat4(1.0f);
+			shapeRotate = glm::mat4(1.0f);
+		}
 
 		// ----- Rendering stuff
 
@@ -176,7 +221,6 @@ int main()
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		// clear the window color buffer bit
 		glClear(GL_COLOR_BUFFER_BIT);
-
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture1);
 		glActiveTexture(GL_TEXTURE1);
@@ -197,7 +241,9 @@ int main()
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
-	
+
+	// glfw: terminate, clearing all previously allocated GLFW resources.
+	// ------------------------------------------------------------------
 	glfwTerminate();
 
 	return 0;
@@ -212,4 +258,53 @@ void processInput(GLFWwindow* window)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
+
+
+	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) // move right
+	{
+		transByInput = glm::translate(transByInput, glm::vec3(translateForce, 0.0f, 0.0f));
+		inputing = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) // move up
+	{
+		transByInput = glm::translate(transByInput, glm::vec3(0.0f, translateForce, 0.0f));
+		inputing = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) // move left
+	{
+		transByInput = glm::translate(transByInput, glm::vec3(-translateForce, 0.0f, 0.0f));
+		inputing = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) // move down
+	{
+		transByInput = glm::translate(transByInput, glm::vec3(0.0f, -translateForce, 0.0f));
+		inputing = true;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) // scale down
+	{
+		scaleByInput = glm::scale(scaleByInput, glm::vec3(1 - scaleForce, 1 - scaleForce, 1 - scaleForce));
+		inputing = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) // scale up
+	{
+		scaleByInput = glm::scale(scaleByInput, glm::vec3(1 + scaleForce, 1 + scaleForce, 1 + scaleForce));
+		inputing = true;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) // Z axis rotate right
+	{
+		rotateByInput = glm::rotate(rotateByInput, glm::radians(rotateForce), glm::vec3(0.0f, 0.0f, 1.0f));
+		inputing = true;
+	}
+	if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) // Z axis rotate lefts
+	{
+		rotateByInput = glm::rotate(rotateByInput, glm::radians(-rotateForce), glm::vec3(0.0f, 0.0f, 1.0f));
+		inputing = true;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+	{
+		resetShape = true;
+	}
 }
